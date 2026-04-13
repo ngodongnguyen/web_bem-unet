@@ -13,13 +13,14 @@ from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 try:
     from mamba_ssm.ops.selective_scan_interface import selective_scan_fn, selective_scan_ref
 except:
-    pass
+    from .csms6s import selective_scan_fn, selective_scan_torch as selective_scan_ref
 
 try:
     from selective_scan import selective_scan_fn as selective_scan_fn_v1
     from selective_scan import selective_scan_ref as selective_scan_ref_v1
 except:
-    pass
+    from .csms6s import selective_scan_fn as selective_scan_fn_v1
+    from .csms6s import selective_scan_torch as selective_scan_ref_v1
 
 DropPath.__repr__ = lambda self: f"timm.DropPath({self.drop_prob})"
 class LDDFB(nn.Module):
