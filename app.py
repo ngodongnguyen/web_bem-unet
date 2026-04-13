@@ -1,4 +1,3 @@
-import sys
 import os
 import numpy as np
 import torch
@@ -6,8 +5,6 @@ import torch.nn.functional as F
 from PIL import Image
 import gradio as gr
 
-# Add model source path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'VM2-UNet'))
 from models.bemunet.bemunet import BEMUNet
 
 # ===================== CONFIG =====================
