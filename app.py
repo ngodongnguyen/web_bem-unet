@@ -91,6 +91,9 @@ SYNAPSE_COLORS = {
 }
 
 # ===================== MODEL LOADING =====================
+# cuDNN 9.1.x chưa hỗ trợ đầy đủ Blackwell (RTX 50xx), disable để fallback sang native CUDA kernels
+torch.backends.cudnn.enabled = False
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 loaded_models = {}
 
