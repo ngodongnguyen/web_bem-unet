@@ -24,7 +24,11 @@ MODEL_CONFIGS = {
         'norm_std': 25.748,
         'description': 'Skin Lesion Segmentation (ISIC 2017)',
         'metrics': {
-            'mIoU': 0.8065,
+            'mIoU':  0.8065,
+            'DSC':   0.8930,
+            'Acc':   0.9650,
+            'Spe':   0.9810,
+            'Sen':   0.8835,
         },
     },
     'ISIC2018': {
@@ -39,7 +43,11 @@ MODEL_CONFIGS = {
         'norm_std': 32.022,
         'description': 'Skin Lesion Segmentation (ISIC 2018)',
         'metrics': {
-            'mIoU': 0.8142,
+            'mIoU':  0.8142,
+            'DSC':   0.8976,
+            'Acc':   0.9512,
+            'Spe':   0.9750,
+            'Sen':   0.8780,
         },
     },
     'Synapse': {
@@ -219,42 +227,51 @@ def predict(image, dataset_name):
 # ===================== METRICS DISPLAY =====================
 def get_metrics_html(dataset_name):
     cfg = MODEL_CONFIGS[dataset_name]
-    html = f"""
-    <div style="padding: 20px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-                border-radius: 12px; color: white; font-family: system-ui;">
-        <h3 style="margin-top:0; color: #e94560;">{cfg['description']}</h3>
-        <table style="width:100%; border-collapse: collapse;">
-    """
+
+    metrics_rows = ""
     for k, v in cfg['metrics'].items():
-        if isinstance(v, float) and v < 1:
-            display = f"{v * 100:.2f}%"
-        else:
-            display = f"{v}"
-        html += f"""
-            <tr style="border-bottom: 1px solid #333;">
-                <td style="padding: 10px; font-weight: bold; color: #a8d8ea;">{k}</td>
-                <td style="padding: 10px; text-align: right; font-size: 1.2em; color: #e94560;">{display}</td>
-            </tr>
+        display = f"{v * 100:.2f}%" if isinstance(v, float) and v < 1 else str(v)
+        metrics_rows += f"""
+            <div style="display:flex; justify-content:space-between; align-items:baseline;
+                        padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
+                <span style="color:#555; font-size:0.875em;">{k}</span>
+                <span style="font-size:1.05em; font-weight:600; color:#1a1a1a;">{display}</span>
+            </div>
         """
-    html += """
-        </table>
-        <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.05);
-                    border-radius: 8px; font-size: 0.85em; color: #aaa;">
-    """
+
     if dataset_name in ['ISIC2017', 'ISIC2018']:
-        html += f"""
-            <b>Task:</b> Binary Skin Lesion Segmentation<br>
-            <b>Input Size:</b> 256 x 256<br>
-            <b>Classes:</b> Background, Lesion
-        """
+        extra = "<p style='margin:10px 0 0; color:#888; font-size:0.8em;'>Binary segmentation · 256×256 input</p>"
     else:
-        html += f"""
-            <b>Task:</b> Multi-Organ Segmentation (9 classes)<br>
-            <b>Input Size:</b> 224 x 224<br>
-            <b>Classes:</b> {', '.join(list(SYNAPSE_CLASSES.values()))}
+        legend_items = ""
+        for cls_id, cls_name in SYNAPSE_CLASSES.items():
+            if cls_id == 0:
+                continue
+            r, g, b = SYNAPSE_COLORS[cls_id]
+            legend_items += f"""
+                <div style="display:flex; align-items:center; gap:6px; padding:2px 0;">
+                    <div style="width:9px; height:9px; border-radius:2px; flex-shrink:0;
+                                background:rgb({r},{g},{b});"></div>
+                    <span style="color:#555; font-size:0.8em;">{cls_name}</span>
+                </div>
+            """
+        extra = f"""
+            <div style="margin-top:12px;">
+                <p style="margin:0 0 7px; color:#888; font-size:0.8em;">Multi-organ · 224×224 input · 8 classes</p>
+                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:3px 10px;">
+                    {legend_items}
+                </div>
+            </div>
         """
-    html += "</div></div>"
-    return html
+
+    return f"""
+    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+                padding:16px 18px; font-family:system-ui,sans-serif;">
+        <p style="margin:0 0 10px; font-size:0.75em; text-transform:uppercase;
+                  letter-spacing:0.8px; color:#9ca3af; font-weight:500;">Performance</p>
+        {metrics_rows}
+        {extra}
+    </div>
+    """
 
 
 def on_dataset_change(dataset_name):
@@ -263,43 +280,71 @@ def on_dataset_change(dataset_name):
 
 # ===================== GRADIO UI =====================
 CUSTOM_CSS = """
-.gradio-container {
-    max-width: 1200px !important;
+.gradio-container { max-width: 1160px !important; }
+footer { display: none !important; }
+
+#run-btn {
+    background: #2563eb !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+    transition: background 0.15s !important;
 }
-.gr-button-primary {
-    background: linear-gradient(135deg, #e94560, #0f3460) !important;
-}
+#run-btn:hover { background: #1d4ed8 !important; }
 """
 
-with gr.Blocks(css=CUSTOM_CSS, title="BEM-UNet Segmentation Demo", theme=gr.themes.Soft()) as demo:
-    gr.Markdown("""
-    # BEM-UNet: Boundary-Enhanced Medical Image Segmentation
-    Upload a medical image and select a dataset/model to perform segmentation.
+with gr.Blocks(
+    css=CUSTOM_CSS,
+    title="BEM-UNet Segmentation",
+    theme=gr.themes.Base(
+        font=[gr.themes.GoogleFont("Inter"), "system-ui", "sans-serif"],
+        primary_hue=gr.themes.colors.blue,
+        neutral_hue=gr.themes.colors.gray,
+    ).set(
+        body_background_fill="#f9fafb",
+        block_background_fill="#ffffff",
+        block_border_color="#e5e7eb",
+        block_border_width="1px",
+        block_radius="10px",
+        block_label_text_color="#6b7280",
+        block_label_text_size="0.78em",
+        input_background_fill="#ffffff",
+        button_primary_background_fill="#2563eb",
+        button_primary_text_color="#ffffff",
+    ),
+) as demo:
+
+    # Header
+    gr.HTML("""
+    <div style="padding: 28px 8px 20px; font-family: system-ui, sans-serif;">
+        <h1 style="margin: 0 0 4px; font-size: 1.5em; font-weight: 700;
+                   color: #111827; letter-spacing: -0.3px;">
+            BEM-UNet
+        </h1>
+        <p style="margin: 0; color: #6b7280; font-size: 0.9em;">
+            Boundary-Enhanced Medical Image Segmentation
+        </p>
+    </div>
     """)
 
-    with gr.Row():
-        with gr.Column(scale=1):
+    with gr.Row(equal_height=False):
+        with gr.Column(scale=4):
             dataset_selector = gr.Radio(
                 choices=['Synapse', 'ISIC2017', 'ISIC2018'],
                 value='Synapse',
-                label="Select Dataset / Model",
+                label="Model",
+                info="Synapse: multi-organ CT    ISIC: skin lesion",
             )
             metrics_display = gr.HTML(value=get_metrics_html('Synapse'))
-            input_image = gr.Image(type="pil", label="Upload Image")
-            predict_btn = gr.Button("Run Segmentation", variant="primary", size="lg")
+            input_image = gr.Image(type="pil", label="Input image", height=240, sources=["upload"])
+            predict_btn = gr.Button("Run segmentation", variant="primary", size="lg", elem_id="run-btn")
 
-        with gr.Column(scale=1):
-            output_image = gr.Image(type="numpy", label="Segmentation Result")
-            output_info = gr.Markdown(label="Details")
+        with gr.Column(scale=6):
+            output_image = gr.Image(type="numpy", label="Result", height=420)
+            output_info = gr.Markdown(value="Upload an image and press **Run segmentation**.")
 
     dataset_selector.change(fn=on_dataset_change, inputs=dataset_selector, outputs=metrics_display)
     predict_btn.click(fn=predict, inputs=[input_image, dataset_selector], outputs=[output_image, output_info])
-
-    gr.Markdown("""
-    ---
-    **Model:** BEM-UNet (Boundary-Enhanced Medical UNet with E-VSS blocks)
-    | **Framework:** PyTorch | **Backbone:** VMamba-Small
-    """)
 
 if __name__ == '__main__':
     demo.launch(server_name='0.0.0.0', server_port=7860, share=False)
